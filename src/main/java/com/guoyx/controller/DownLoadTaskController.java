@@ -19,8 +19,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 @Controller
 @RequestMapping("/download")
 public class DownLoadTaskController extends BaseController{
-    @Value("${download.path}")
-    private String downloadPath;
 
     public void addTask(String taskURL, String remark) {
 
