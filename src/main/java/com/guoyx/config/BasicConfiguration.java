@@ -24,15 +24,14 @@ public class BasicConfiguration extends WebSecurityConfigurerAdapter {
     @Override
     protected void configure(HttpSecurity http) throws Exception {
         //没有权限自动跳转到登陆页（自带登录页）
-        //http.formLogin();
+        http.formLogin();
 
         //请求授权规则
         http.authorizeRequests()
-                .anyRequest()
-                .authenticated()
-                .and()
-                .httpBasic();
-
+                .antMatchers("/download/**")
+                .access("hasAnyRole('ADMIN','USER')")
+                .antMatchers("/filePanel")
+                .access("hasAnyRole('ADMIN','USER')");
     }
 
 }

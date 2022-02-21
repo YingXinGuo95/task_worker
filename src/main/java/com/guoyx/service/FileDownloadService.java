@@ -1,22 +1,20 @@
 package com.guoyx.service;
 
+import com.guoyx.entity.FileInfoEntity;
 import com.guoyx.util.HttpUtil;
-import java.nio.file.Files;
-import java.nio.file.LinkOption;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.regex.Pattern;
 import okhttp3.Request;
 import okhttp3.Response;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.thymeleaf.util.StringUtils;
+
+import java.io.File;
+import java.nio.file.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.concurrent.*;
 
 @Service
 public class FileDownloadService extends BaseService{
@@ -37,17 +35,37 @@ public class FileDownloadService extends BaseService{
             throw new IllegalArgumentException("备注信息长度过长，需小于10个字符");
         }
 
-        String pattern = "/(http|https):\\/\\/([\\w.]+\\/?)\\S*/";
-        if (!Pattern.matches(pattern, taskURL)) {
-            throw new IllegalArgumentException("下载链接不正确，需要是http或者https开头的资源");
+        if (StringUtils.isBlank(taskURL)) {
+            throw new IllegalArgumentException("下载链接不能为空");
+        }
+
+        if (!StringUtils.startsWithAny(taskURL, "http", "https")) {
+            throw new IllegalArgumentException("下载链接必须是以http或者https开头");
         }
 
         //添加下载任务
         taskPool.execute(() -> downloadFile(taskURL, remark));
     }
 
+    public List<FileInfoEntity> listFiles() {
+        File filePath = new File(downloadPath);
+        Collection<File> files = FileUtils.listFiles(filePath, null, true);
+
+        List<FileInfoEntity> fileList = new ArrayList<>();
+        for (File file : files) {
+            FileInfoEntity fileInfo = new FileInfoEntity();
+            fileInfo.setFileName(file.getName());
+            fileInfo.setSize(file.length());
+
+            fileList.add(fileInfo);
+        }
+
+        return fileList;
+    }
+
     private void downloadFile(String taskURL, String remark) {
         try {
+            logger.info("start download file. url={} remark={}", taskURL, remark);
             Request request = new Request.Builder()
                     .url(taskURL)
                     .build();
@@ -59,7 +77,7 @@ public class FileDownloadService extends BaseService{
             byte[] bytes = response.body().bytes();
 
             //切割出图片名称
-            String filename = org.apache.commons.lang3.StringUtils.substringAfterLast(taskURL, "/");
+            String filename = StringUtils.substringAfterLast(taskURL, "/");
             Path folderPath = Paths.get(downloadPath);
             boolean desk = Files.exists(folderPath);
             if (!desk) {
@@ -67,17 +85,23 @@ public class FileDownloadService extends BaseService{
                 Files.createDirectories(folderPath);
             }
 
-            String suffix = org.apache.commons.lang3.StringUtils.isBlank(remark) ? org.apache.commons.lang3.StringUtils.EMPTY : "[" + remark + "]";
-            Path filePath = Paths.get(downloadPath + suffix + filename);
+            String suffix = StringUtils.isBlank(remark) ? StringUtils.EMPTY : "[" + remark + "]";
+            Path filePath = Paths.get(downloadPath + File.separator + suffix + filename);
             boolean exists = Files.exists(filePath, LinkOption.NOFOLLOW_LINKS);
             if (!exists) {
                 //不存在文件
                 Files.write(filePath, bytes, StandardOpenOption.CREATE);
             }
+            logger.info("finish download file task. url={} remark={}", taskURL, remark);
 
         } catch (Exception e) {
             logger.error("addDownloadTask error. url={} remark={}", taskURL, remark, e);
         }
+    }
+
+    public File getFilePath(String fileName) {
+        String filePath = downloadPath + File.separator + fileName;
+        return new File(filePath);
     }
 
 }
