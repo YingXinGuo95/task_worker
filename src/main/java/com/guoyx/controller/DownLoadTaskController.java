@@ -31,7 +31,7 @@ public class DownLoadTaskController extends BaseController{
     public Response addTask(String taskURL, String remark) {
         try{
             fileDownloadService.addTask(taskURL, remark);
-            return new Response(RespCode.SUCCESS);
+            return new Response(RespCode.SUCCESS.getCode(), "任务添加成功，等待后台下载...");
         }catch (Exception e){
             logger.error("addTask error", e);
             return new Response(RespCode.FAIL.getCode(), e.getMessage());
